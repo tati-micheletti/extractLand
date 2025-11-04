@@ -38,7 +38,7 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     #createsOutput("objectName", "objectClass", "output object description", ...),
-    createsOutput(objectName = extractLand, objectClass = "data.table", desc = "Landscape values matched by year to points")
+    createsOutput(objectName = 'extractLand', objectClass = "data.table", desc = "Landscape values matched by year to points")
   )
 ))
 
