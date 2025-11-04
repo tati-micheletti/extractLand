@@ -88,7 +88,7 @@ Init <- function(sim) {
   }, yr = validYears)
   
   # Combine and store
-  sim$extractedPoints <- rbindlist(extracted_list, fill = TRUE)
+  sim$extractLand <- rbindlist(extracted_list, fill = TRUE)
   #message("Extraction complete: ", nrow(sim$extractedPoints), " records.")
   
   # Schedule save event
