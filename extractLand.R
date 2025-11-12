@@ -13,6 +13,8 @@ defineModule(sim, list(
   reqdPkgs = list("SpaDES.core (>= 2.1.8.9001)", "ggplot2", "terra", "data.table"),
   parameters = bindrows(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
+    defineParameter("caribouYears", "integer", NULL, NA, NA,
+                    paste0("This is the year range of data we want to run models for.")),
     defineParameter(".plots", "character", "screen", NA, NA,
                     "Used by Plots function, which can be optionally used here"),
     defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
@@ -34,8 +36,12 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = "landscapeYearly", objectClass = 'spatRaster',
-                 desc = 'spatRaster stack of the yearly landscape layers')
+    expectsInput(objectName = "landscapeYearly", objectClass = 'list',
+                 desc = 'list of spatRaster stacks of the yearly landscape layers'),
+    expectsInput(objectName = "landscape5Yearly", objectClass = 'list',
+                 desc = 'list of spatRaster stacks of the 5 yearly landscape layers'),
+    expectsInput(objectName = "tracks", objectClass = 'data.table',
+                 desc = 'tracks of used and random steps to extract environmental covariates for')
   ),
   outputObjects = bindrows(
     #createsOutput("objectName", "objectClass", "output object description", ...),
@@ -59,34 +65,39 @@ doEvent.extractLand <- function(sim, eventTime, eventType, priority) {
 
 Init <- function(sim) {
   #message("Starting extraction...")
-
-  tracks <- sim$caribouLoc
-  years <- sort(unique(tracks$year))
+browser()
+  if(!is.null(Par$caribouYears)){
+    tracks <- sim$tracks[year >= min(Par$caribouYears) & year <= max(Par$caribouYears)]
+  }
+  tracks <- sim$tracks
+  years <- sort(unique(sim$tracks$year))
 
   # Get available years from all dynamic layers
-  fireYears      <- names(sim$landscapeYearly$histFire)
-  harvestYears   <- names(sim$landscapeYearly$timeSinceHarvest)
-  landcoverYears <- names(sim$landscapeYearly$histLand)
-  availableYears <- Reduce(intersect, list(fireYears, harvestYears, landcoverYears))
-  validYears <- intersect(as.character(years), availableYears)
+  # fireYears      <- names(sim$landscapeYearly$histFire)
+  # harvestYears   <- names(sim$landscapeYearly$timeSinceHarvest)
+  # landcoverYears <- names(sim$landscapeYearly$histLand)
+  # availableYears <- Reduce(intersect, list(fireYears, harvestYears, landcoverYears))
+  # validYears <- intersect(as.character(years), availableYears)
 
   # Main extraction
-  extracted_list <- Map(function(yr) {
-    message("Extracting for year: ", yr)
 
-    pts_yr <- tracks[tracks$year == as.integer(yr), ]
-    fire_rast <- sim$landscape$fire[[yr]]
-    harvest_rast <- sim$landscape$harvest[[yr]]
-    landcover_rast <- sim$landscape$landcover[[yr]]
 
-    landscapeYr <- c(fire_rast, harvest_rast, landcover_rast)
-    names(landscapeYr) <- c("timeSinceFire", "timeSinceHarvest", "landcover")
-
-    vals <- terra::extract(landscapeYr, pts_yr)
-    vals <- vals[, -1, drop = FALSE]
-
-    data.table(cbind(as.data.frame(pts_yr), vals))
-  }, yr = validYears)
+  # extracted_list <- Map(function(yr) {
+  #   message("Extracting for year: ", yr)
+  #
+  #   pts_yr <- tracks[tracks$year == as.integer(yr), ]
+  #   fire_rast <- sim$landscape$fire[[yr]]
+  #   harvest_rast <- sim$landscape$harvest[[yr]]
+  #   landcover_rast <- sim$landscape$landcover[[yr]]
+  #
+  #   landscapeYr <- c(fire_rast, harvest_rast, landcover_rast)
+  #   names(landscapeYr) <- c("timeSinceFire", "timeSinceHarvest", "landcover")
+  #
+  #   vals <- terra::extract(landscapeYr, pts_yr)
+  #   vals <- vals[, -1, drop = FALSE]
+  #
+  #   data.table(cbind(as.data.frame(pts_yr), vals))
+  # }, yr = validYears)
 
   # Combine and store
   sim$extractLand <- rbindlist(extracted_list, fill = TRUE)
