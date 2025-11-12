@@ -34,7 +34,8 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = NA, objectClass = NA, desc = NA, sourceURL = NA)
+    expectsInput(objectName = "landscapeYearly", objectClass = 'spatRaster',
+                 desc = 'spatRaster stack of the yearly landscape layers')
   ),
   outputObjects = bindrows(
     #createsOutput("objectName", "objectClass", "output object description", ...),
@@ -49,7 +50,7 @@ doEvent.extractLand <- function(sim, eventTime, eventType, priority) {
     init = {
       # run data harmonization
       sim <- Init(sim)
-      
+
     },
     warning(noEventWarning(sim))
   )
@@ -58,48 +59,48 @@ doEvent.extractLand <- function(sim, eventTime, eventType, priority) {
 
 Init <- function(sim) {
   #message("Starting extraction...")
-  
+
   tracks <- sim$caribouLoc
   years <- sort(unique(tracks$year))
-  
+
   # Get available years from all dynamic layers
   fireYears      <- names(sim$landscapeYearly$histFire)
   harvestYears   <- names(sim$landscapeYearly$timeSinceHarvest)
   landcoverYears <- names(sim$landscapeYearly$histLand)
   availableYears <- Reduce(intersect, list(fireYears, harvestYears, landcoverYears))
   validYears <- intersect(as.character(years), availableYears)
-  
+
   # Main extraction
   extracted_list <- Map(function(yr) {
     message("Extracting for year: ", yr)
-    
+
     pts_yr <- tracks[tracks$year == as.integer(yr), ]
     fire_rast <- sim$landscape$fire[[yr]]
     harvest_rast <- sim$landscape$harvest[[yr]]
     landcover_rast <- sim$landscape$landcover[[yr]]
-    
+
     landscapeYr <- c(fire_rast, harvest_rast, landcover_rast)
     names(landscapeYr) <- c("timeSinceFire", "timeSinceHarvest", "landcover")
-    
+
     vals <- terra::extract(landscapeYr, pts_yr)
     vals <- vals[, -1, drop = FALSE]
-    
+
     data.table(cbind(as.data.frame(pts_yr), vals))
   }, yr = validYears)
-  
+
   # Combine and store
   sim$extractLand <- rbindlist(extracted_list, fill = TRUE)
   #message("Extraction complete: ", nrow(sim$extractedPoints), " records.")
-  
+
   return(invisible(sim))
-  
+
 }
 ### template for save events
 Save <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
   # do stuff for this event
   sim <- saveFiles(sim)
-  
+
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
@@ -107,7 +108,7 @@ Save <- function(sim) {
 .inputObjects <- function(sim) {
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
-  
-  
+
+
   return(invisible(sim))
 }
