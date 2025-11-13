@@ -15,6 +15,8 @@ defineModule(sim, list(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter("caribouYears", "integer", NULL, NA, NA,
                     paste0("This is the year range of data we want to run models for.")),
+    defineParameter("histLandYears", "integer", 2010:2023, NA, NA,
+                    paste0("This is the year range we use past (not simulated) landscape layers.")),
     defineParameter(".plots", "character", "screen", NA, NA,
                     "Used by Plots function, which can be optionally used here"),
     defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA,
@@ -64,40 +66,51 @@ doEvent.extractLand <- function(sim, eventTime, eventType, priority) {
 }
 
 Init <- function(sim) {
-  #message("Starting extraction...")
-browser()
+  message("Starting extraction...")
+
   if(!is.null(Par$caribouYears)){
     tracks <- sim$tracks[year >= min(Par$caribouYears) & year <= max(Par$caribouYears)]
   }
   tracks <- sim$tracks
   years <- sort(unique(sim$tracks$year))
+  landYears <- c("2019","2020","2021") #update this to a param (histLandYears)
 
   # Get available years from all dynamic layers
-  # fireYears      <- names(sim$landscapeYearly$histFire)
-  # harvestYears   <- names(sim$landscapeYearly$timeSinceHarvest)
-  # landcoverYears <- names(sim$landscapeYearly$histLand)
-  # availableYears <- Reduce(intersect, list(fireYears, harvestYears, landcoverYears))
-  # validYears <- intersect(as.character(years), availableYears)
+  validYears <- intersect(as.character(years), landYears)
 
   # Main extraction
+  extracted_list <- lapply(validYears, function(yr){
+    browser()
+    message("Extracting for year ", yr)
 
+    pts_yr <- tracks[tracks$year == as.integer(yr), ]
 
-  # extracted_list <- Map(function(yr) {
-  #   message("Extracting for year: ", yr)
-  #
-  #   pts_yr <- tracks[tracks$year == as.integer(yr), ]
-  #   fire_rast <- sim$landscape$fire[[yr]]
-  #   harvest_rast <- sim$landscape$harvest[[yr]]
-  #   landcover_rast <- sim$landscape$landcover[[yr]]
-  #
-  #   landscapeYr <- c(fire_rast, harvest_rast, landcover_rast)
-  #   names(landscapeYr) <- c("timeSinceFire", "timeSinceHarvest", "landcover")
-  #
-  #   vals <- terra::extract(landscapeYr, pts_yr)
-  #   vals <- vals[, -1, drop = FALSE]
-  #
-  #   data.table(cbind(as.data.frame(pts_yr), vals))
-  # }, yr = validYears)
+    # Annual data
+    annual_rasts <- sim$landscapeYearly[[paste0("year", yr)]]
+
+    # 5 Year data
+    fiveYear <- paste0("intYear", yr)
+    if (!is.null(sim$landscape5Yearly[[fiveYear]])) {
+      land5Obj <- sim$landscape5Yearly[[fiveYear]]
+    } else {
+      message("No 5-year data found for ", fiveYear)
+      land5Obj <- NULL
+    }
+
+    # combine all the rasters
+    landscapeYr <- c(annual_rasts, fiveYear) #might be an issue
+
+    # extract the values
+    coords <- pts_yr[, .(x1_, y1_)]
+    vals <- terra::extract(landscapeYr, coords)
+    vals <- vals[, -1, drop = FALSE]  # drop cell ID column
+
+    # merge
+    dt <- data.table(cbind(as.data.frame(pts_yr), vals))
+    dt$year <- as.integer(yr)
+
+    return(dt)
+  })
 
   # Combine and store
   sim$extractLand <- rbindlist(extracted_list, fill = TRUE)
@@ -110,7 +123,6 @@ browser()
 Save <- function(sim) {
   # ! ----- EDIT BELOW ----- ! #
   # do stuff for this event
-  sim <- saveFiles(sim)
 
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
