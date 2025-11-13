@@ -80,7 +80,6 @@ Init <- function(sim) {
 
   # Main extraction
   extracted_list <- lapply(validYears, function(yr){
-    browser()
     message("Extracting for year ", yr)
 
     pts_yr <- tracks[tracks$year == as.integer(yr), ]
