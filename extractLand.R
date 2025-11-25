@@ -90,13 +90,23 @@ Init <- function(sim) {
     crs_year <- terra::crs(annual_rasts[[1]])
 
     # Annual raster value extraction
-    pts_vect <- terra::vect(pts_yr[, .(x1_, y1_)],
-                            geom = c("x1_", "y1_"),
-                            crs = crs_year)
+    # Extract Start raster values
+    vals_start <- terra::extract(
+      annual_rasts,
+      terra::vect(pts_yr[, .(x1_, y1_)], geom = c("x1_", "y1_"),
+                  crs = terra::crs(annual_rasts[[1]]))
+    )[, -1, drop = FALSE]
 
-    vals <- terra::extract(annual_rasts, pts_vect)
-    vals <- vals[, -1, drop = FALSE]  # drop cell ID
+    setnames(vals_start, paste0(names(vals_start), "_start"))
 
+    # Extract End raster values
+    vals_end <- terra::extract(
+      annual_rasts,
+      terra::vect(pts_yr[, .(x2_, y2_)], geom = c("x2_", "y2_"),
+                  crs = terra::crs(annual_rasts[[1]]))
+    )[, -1, drop = FALSE]
+
+    setnames(vals_end, paste0(names(vals_end), "_end"))
 
     # Convert 5-year SpatVectors to sf
 
@@ -165,12 +175,13 @@ Init <- function(sim) {
     }
 
     # Combine the annual extractions and 5 year distance calculations
-
-    dt <- data.table(cbind(
-      vals,
-      as.data.frame(pts_yr)
-    ))
-
+    dt <- data.table(
+      cbind(
+        as.data.frame(pts_yr),
+        vals_start,
+        vals_end
+      )
+    )
     dt$year <- as.integer(yr)
 
     return(dt)
